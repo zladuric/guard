@@ -116,6 +116,11 @@ describe Guard do
 
       subject.start
     end
+
+    it 'should start listener' do
+      @listener.should_receive(:start)
+      subject.start
+    end
     
   end
   
