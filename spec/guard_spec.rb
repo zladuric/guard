@@ -54,16 +54,87 @@ describe Guard do
       ::Guard.listener.should be_kind_of(Guard::Listener)
     end
   end
+
+  describe "start" do
+
+    before(:each) do
+      @guard = mock(::Guard::Guard)
+      @guard.stub!(:reload_at_start?).and_return(false)
+      @guard.stub!(:run_all_at_start?).and_return(false)
+
+      @listener = mock(::Guard::Polling)
+      @listener.stub!(:on_change)
+      @listener.stub!(:start).and_return(true)
+
+      ::Guard::Listener.stub!(:init).and_return(@listener)
+      ::Guard::Dsl.stub!(:evaluate_guardfile)
+      ::Guard::Interactor.stub!(:init_signal_traps)
+      subject.stub!(:guards).and_return([@guard])
+      subject.stub!(:supervised_task).with(anything(), :start).and_return(true)
+    end
+
+    it 'should evaluate Guardfile' do
+      ::Guard::Dsl.should_receive(:evaluate_guardfile)
+      subject.start
+    end
+
+    it 'should init signal traps' do
+      ::Guard::Interactor.should_receive(:init_signal_traps)
+      subject.start
+    end
+
+    it 'should define listener on_change' do
+      @listener.should_receive(:on_change)
+      subject.start
+    end
+
+    it 'should start guards' do
+      subject.should_receive(:supervised_task).with(@guard, :start).and_return(true)
+      subject.start
+    end
+
+    it 'should call method definined to run at start' do
+      @guard.class.stub(:instance_methods).with(false).and_return([:test, :test_at_start?])
+
+      @guard.should_receive(:run_all_at_start?).and_return(true)
+      @guard.should_receive(:run_all).and_return(true)
+
+      @guard.should_receive(:test_at_start?).and_return(true)
+      @guard.should_receive(:test).and_return(true)
+
+      subject.start
+    end
+
+    it 'should not call method definined to not run at start' do
+      @guard.class.stub(:instance_methods).with(false).and_return([:test, :test_at_start?])
+
+      @guard.should_receive(:run_all_at_start?).and_return(false)
+      @guard.should_not_receive(:run_all)
+
+      @guard.should_receive(:test_at_start?).and_return(false)
+      @guard.should_not_receive(:test)
+
+      subject.start
+    end
+    
+  end
   
   describe "supervised_task" do
     subject { ::Guard.init }
     
     before :each do
       @g = mock(Guard::Guard)
+      @g.stub!(:respond_to).and_return { false }
       @g.stub!(:regular).and_return { true }
       @g.stub!(:spy).and_return { raise "I break your system" }
       @g.stub!(:pirate).and_raise Exception.new("I blow your system up")
       @g.stub!(:regular_arg).with("given_path").and_return { "given_path" }
+      @g.stub!(:enable_method).and_return { true }
+      @g.stub!(:enable_method?).and_return { true }
+      @g.stub!(:respond_to).with(:enable_method?).and_return { true }
+      @g.stub!(:disable_method).and_return { true }
+      @g.stub!(:disable_method?).and_return { false }
+      @g.stub!(:respond_to).with(:disable_method?).and_return { true }
       subject.guards.push @g
     end
     
@@ -92,6 +163,19 @@ describe Guard do
       subject.guards.should be_include(@g)
       ::Guard.supervised_task(@g, :regular_arg, "given_path").should == "given_path"
     end
+
+    it 'should let it go when method is enable by guard options' do
+      subject.guards.should be_include(@g)
+      subject.supervised_task(@g, :enable_method).should be_true
+      subject.guards.should be_include(@g)
+    end
+
+    it 'should not let it go when method is disable by guard options' do
+      subject.guards.should be_include(@g)
+      subject.supervised_task(@g, :disable_method).should be_false
+      subject.guards.should be_include(@g)
+    end
+
   end
   
 end

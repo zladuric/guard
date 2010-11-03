@@ -39,7 +39,13 @@ module Guard
         end
         
         UI.info "Guard is now watching at '#{Dir.pwd}'"
-        guards.each { |g| supervised_task(g, :start) }
+        guards.each do |guard|
+          if supervised_task(guard, :start)
+            (guard.class.instance_methods(false) | ::Guard::Guard.instance_methods(false)).each do |m|
+              guard.send(:"#{$1}") if m.to_s =~ /^(.+)_at_start\?$/ && guard.send(:"#{$1}_at_start?")
+            end
+          end
+        end
         listener.start
       end
     end
@@ -63,7 +69,11 @@ module Guard
     # Let a guard execute his task but
     # fire it if his work lead to system failure
     def supervised_task(guard, task_to_supervise, *args)
-      guard.send(task_to_supervise, *args)
+      if !guard.respond_to(:"#{task_to_supervise}?") || guard.send(:"#{task_to_supervise}?")
+        guard.send(task_to_supervise, *args)
+      else
+        false
+      end
     rescue Exception
       UI.error("#{guard.class.name} guard failed to achieve its <#{task_to_supervise.to_s}> command: #{$!}")
       ::Guard.guards.delete guard
