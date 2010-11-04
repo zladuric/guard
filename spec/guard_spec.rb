@@ -61,6 +61,7 @@ describe Guard do
       @guard = mock(::Guard::Guard)
       @guard.stub!(:reload_at_start?).and_return(false)
       @guard.stub!(:run_all_at_start?).and_return(false)
+      @guard.stub!(:respond_to?)
 
       @listener = mock(::Guard::Polling)
       @listener.stub!(:on_change)
@@ -93,26 +94,30 @@ describe Guard do
       subject.start
     end
 
-    it 'should call method definined to run at start' do
-      @guard.class.stub(:instance_methods).with(false).and_return([:test, :test_at_start?])
-
-      @guard.should_receive(:run_all_at_start?).and_return(true)
-      @guard.should_receive(:run_all).and_return(true)
-
-      @guard.should_receive(:test_at_start?).and_return(true)
-      @guard.should_receive(:test).and_return(true)
+    it 'should call reload at start if needed' do
+      @guard.should_receive(:respond_to?).with(:reload_at_start?).and_return(true)
+      @guard.should_receive(:reload_at_start?).and_return(true)
+      @guard.should_receive(:reload).and_return(true)
 
       subject.start
     end
 
-    it 'should not call method definined to not run at start' do
-      @guard.class.stub(:instance_methods).with(false).and_return([:test, :test_at_start?])
+    it 'should call run_all at start if needed' do
+      @guard.should_receive(:respond_to?).with(:run_all_at_start?).and_return(true)
+      @guard.should_receive(:run_all_at_start?).and_return(true)
+      @guard.should_receive(:run_all).and_return(true)
 
+      subject.start
+    end
+
+    it 'should not call reload  and run_all at start if not needed' do
+      @guard.should_receive(:respond_to?).with(:reload_at_start?).and_return(true)
+      @guard.should_receive(:reload_at_start?).and_return(false)
+      @guard.should_not_receive(:reload)
+
+      @guard.should_receive(:respond_to?).with(:run_all_at_start?).and_return(true)
       @guard.should_receive(:run_all_at_start?).and_return(false)
       @guard.should_not_receive(:run_all)
-
-      @guard.should_receive(:test_at_start?).and_return(false)
-      @guard.should_not_receive(:test)
 
       subject.start
     end

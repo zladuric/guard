@@ -41,8 +41,8 @@ module Guard
         UI.info "Guard is now watching at '#{Dir.pwd}'"
         guards.each do |guard|
           if supervised_task(guard, :start)
-            (guard.class.instance_methods(false) | ::Guard::Guard.instance_methods(false)).each do |m|
-              guard.send(:"#{$1}") if m.to_s =~ /^(.+)_at_start\?$/ && guard.send(:"#{$1}_at_start?")
+            %w[reload run_all].each do |m|
+              guard.send(m) if guard.respond_to?(:"#{m}_at_start?") && guard.send(:"#{m}_at_start?")
             end
           end
         end
